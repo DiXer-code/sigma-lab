@@ -1,55 +1,58 @@
-# Клієнт MAUI - створює власник зони Z4 (Юра)
+# MAUI-клієнт зони Z4
 
-Проєкт свідомо **не доданий у `LabStem.slnx`** і не створений у репозиторії.
+Застосунок .NET MAUI для Android і Windows. Локальний доменний доступ використовує
+LabDbContext і Fluent-конфігурації з Lab.Infrastructure; окремі доменні моделі клієнт не створює.
 
-## Чому
+## Залежності та запуск
 
-Проєкт MAUI створюється лише на машині з установленим workload `maui` (плюс Android SDK).
-Якщо додати його в solution до того, як усі учасники мають цей workload, `dotnet build LabStem.slnx`
-почне падати в усіх - і CI теж. Тому клієнт створюється окремо, а потім додається в solution
-**тим PR, який його додає** - разом з оновленням CI.
+Потрібен .NET SDK 10, MAUI workloads для .NET 10, Android SDK API 36,
+build-tools 36.0.0 і JDK 21. Наявність workload у списку не гарантує, що встановлено
+SDK потрібної версії: компоненти MAUI для .NET 8/9 не збирають цей проєкт.
 
-## Що зробити (перший крок зони Z4)
+    dotnet workload list
+    dotnet workload install maui-windows maui-android
+    dotnet restore src/Lab.Client.Maui/Lab.Client.Maui.csproj
+    dotnet build src/Lab.Client.Maui/Lab.Client.Maui.csproj -c Release -f net10.0-windows10.0.19041.0
+    dotnet build src/Lab.Client.Maui/Lab.Client.Maui.csproj -c Release -f net10.0-android
+    dotnet run --project src/Lab.Client.Maui/Lab.Client.Maui.csproj -f net10.0-windows10.0.19041.0
 
-```bash
-# 1. Workload MAUI (кілька гігабайт, ставиться один раз)
-dotnet workload install maui
+Відсутні залежності Android встановлюються стандартною ціллю SDK:
 
-# 2. Перевірити, що шаблон доступний
-dotnet new list maui
+    dotnet build src/Lab.Client.Maui/Lab.Client.Maui.csproj -t:InstallAndroidDependencies -f net10.0-android -p:AndroidSdkDirectory=C:/android-sdk -p:JavaSdkDirectory=C:/jdk -p:AcceptAndroidSdkLicenses=True
 
-# 3. Створити проєкт
-dotnet new maui -n Lab.Client.Maui -o src/Lab.Client.Maui
+Шляхи AndroidSdkDirectory і JavaSdkDirectory можна вибрати у власному каталозі;
+для наступних збірок передавайте ті самі властивості. Короткі шляхи до NuGet-кешу
+й Android SDK запобігають помилкам читання архівів на Windows.
 
-# 4. Додати в solution
-dotnet sln LabStem.slnx add src/Lab.Client.Maui/Lab.Client.Maui.csproj
+Клієнт зберігає SQLite файл у приватному каталозі застосунку та застосовує наявні міграції
+з Lab.Migrations.Sqlite. Екран показує майданчики з локальної БД і стан черги синхронізації.
+Після злиття моделі Experiment у main екран серій має використовувати саме її.
 
-# 5. Додати посилання на спільні шари (домен і контракти - ті самі, що на сервері)
-dotnet add src/Lab.Client.Maui reference src/Lab.Domain
-dotnet add src/Lab.Client.Maui reference src/Lab.Contracts
+## Черга синхронізації
 
-# 6. Збірка
-dotnet build LabStem.slnx -c Release
-```
+Операції мають UUID, тип ідентифікованого ресурсу, JSON payload, час створення, кількість спроб,
+останню помилку та один зі станів Pending, Sent, Failed. Додавання ідемпотентне за UUID.
+Помилкову операцію можна повернути в Pending; статус Sent фіксується після відповіді сервера.
 
-## Що важливо зробити в тому ж PR
+Черга зберігається атомарним JSON-файлом у приватному каталозі клієнта. Вона відокремлена від
+доменного LabDbContext, бо поточний спільний контекст і Fluent-модель належать Z1; це не додає
+клієнтської копії Experiment або міграцій до чужої зони. Рішення та межі гарантій
+описані в docs/decisions-log.md, запис №8. Зараз реалізовано локальне сховище операцій;
+мережеве відправлення й політика конфліктів належать наступному issue #14.
 
-1. **CI має продовжувати проходити.** На раннері GitHub Actions workload MAUI не встановлений,
-   тому в workflow або додається крок `dotnet workload install maui` для відповідного job,
-   або клієнт виключається зі збірки CI окремим фільтром - рішення фіксується в
-   `docs/decisions-log.md` з поясненням.
-2. **Той самий домен і ті самі контракти.** Клієнт не дублює моделі: він посилається на
-   `Lab.Domain` і `Lab.Contracts`. Якщо для клієнта потрібен свій тип - він живе в цьому проєкті
-   і не протікає в серверні шари.
-3. **Локальна база - SQLite** з тією ж конфігурацією сутностей (`LabDbContext` + Fluent-
-   конфігурації з `Lab.Infrastructure`), щоб схема на клієнті й на сервері не розходилась.
-4. **`ClientId`** (UUID) кожного вимірювання генерується на пристрої - це ключ ідемпотентності
-   під час синхронізації. Саме цей кейс перевіряють приймальні кейси 14 і 15.
+## Перевірки
 
-## Що входить у зону Z4
+    dotnet build LabStem.slnx -c Release
+    dotnet test LabStem.slnx --collect:"XPlat Code Coverage"
+    python scripts/coverage-summary.py
 
-- екрани: вхід, список серій, серія (список вимірів), додавання виміру, стан синхронізації;
-- офлайн-режим: робота без мережі, черга операцій зі станами `Pending / Sent / Failed`;
-- повторна відправка без дублів (ідемпотентність за `ClientId`);
-- розв'язання конфліктів за версією запису - політика документується й покривається тестами;
-- фоновий обробник (`Lab.Worker`) - перерахунок статистик, експорт, чистка.
+LocalDatabaseServiceTests застосовує спільні міграції SQLite й перевіряє читання
+збереженого Site. SyncQueueStoreTests перевіряє ідемпотентність після повторного
+відкриття, переходи станів, порожню чергу, паралельні записи та пошкоджений файл.
+Тести цих сервісів виконуються без MAUI UI через підключення того самого вихідного коду.
+
+## Межі цього етапу
+
+Доменна модель у main зараз має Site. Тому каркас не оголошує Experiment локально;
+список серій буде підключено до моделі Z1 після її злиття. Додавання MAUI-проєкту до solution та
+CI потребує узгодження інтеграції з власником Z2, оскільки .github/ належить його зоні.

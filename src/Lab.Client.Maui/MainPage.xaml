@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:sites="clr-namespace:Lab.Domain.Sites;assembly=Lab.Domain"
+             x:Class="Lab.Client.Maui.MainPage"
+             Title="Польова лабораторія">
+    <Grid Padding="24" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="16">
+        <Label Text="Польова лабораторія"
+               FontSize="28"
+               FontAttributes="Bold"
+               SemanticProperties.HeadingLevel="Level1" />
+        <Label x:Name="SyncStatus"
+               Grid.Row="1"
+               Text="Черга синхронізації завантажується…" />
+        <Button Grid.Row="2"
+                Text="Оновити локальні дані"
+                Clicked="OnRefreshClicked" />
+        <CollectionView x:Name="SitesView"
+                        Grid.Row="3"
+                        EmptyView="У локальній базі поки немає майданчиків.">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="sites:Site">
+                    <Border Padding="12" Margin="0,0,0,8">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="{Binding Name}" FontAttributes="Bold" FontSize="18" />
+                            <Label Text="{Binding Latitude, StringFormat='Широта: {0:F5}'}" />
+                            <Label Text="{Binding Longitude, StringFormat='Довгота: {0:F5}'}" />
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>
