@@ -18,6 +18,12 @@
     <ProjectReference Include="..\..\src\Lab.Domain\Lab.Domain.csproj" />
     <ProjectReference Include="..\..\src\Lab.Infrastructure\Lab.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Lab.Migrations.Postgres\Lab.Migrations.Postgres.csproj" />
+    <ProjectReference Include="..\..\src\Lab.Migrations.Sqlite\Lab.Migrations.Sqlite.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\Lab.Client.Maui\Sync\SyncQueueStore.cs" Link="Sync\SyncQueueStore.cs" />
+    <Compile Include="..\..\src\Lab.Client.Maui\Data\LocalDatabaseService.cs" Link="Data\LocalDatabaseService.cs" />
   </ItemGroup>
 
   <ItemGroup>
