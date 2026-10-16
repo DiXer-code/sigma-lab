@@ -182,3 +182,36 @@ LocalDatabaseServiceTests застосовує спільні міграції S
 
 **Перевірка.** `MigrationFactoryTests`, `MigrationLifecycleTests` та
 `LocalDatabaseServiceTests`; прогін із `LAB_TEST_POSTGRES=1` і реальною PostgreSQL.
+
+## 10. Окрема CI-збірка клієнта у спільному solution
+
+**Проблема.** Після #22 клієнт збирається локально, але не входить у solution і CI.
+Додавання MAUI до звичайної Linux-збірки вимагало б платформних workloads на кожному прогоні.
+
+**Рішення.** LabStem.slnx містить MAUI; LabStem.Server.slnf фільтрує серверні проєкти
+й тести цього solution. Наявний job build-and-test використовує фільтр на Ubuntu.
+Окремий Windows job maui-build встановлює maui-android і maui-windows та збирає обидві
+платформи в Release. Фільтр шляхів у job changes враховує клієнт, транзитивні залежності,
+solution, SDK/пакетні параметри та workflow. Серверна перевірка виконується для кожного PR.
+
+**Що це дало.** Клієнт видно у solution, зміни його залежностей також перевіряються,
+а документаційні й серверні PR не встановлюють workloads. Issue #23 фіксує інтеграцію
+із зоною Z2; рев'ю належить @DiXer-code. Issue #9 очікує модель Z1 та приймання UI.
+
+**Перевірка.** Повна Release-збірка solution на Windows, build/test серверного фільтра
+з реальною PostgreSQL та CI job Android/Windows. Успішна компіляція не підтверджує запуск UI.
+
+## 11. Сумісність серверного фільтра з мінімальним SDK
+
+**Проблема.** Рев'ю Z2 у PR #24 виявило MSB4025 на Windows із дозволеним SDK
+10.0.100: прямі слеші у projects файлу .slnf не зіставлялися зі шляхами solution.
+Новіший SDK на runner приховував цю несумісність через rollForward=latestFeature.
+
+**Рішення.** Усі projects у LabStem.Server.slnf використовують JSON-екрановані
+зворотні слеші. Мінімальну підтримувану версію SDK не підвищено. Окрема матриця CI
+збирає серверний фільтр і запускає тести на Windows та Ubuntu саме SDK 10.0.100.
+Лише в робочій копії runner rollForward вимикається; версія перевіряється командою
+`dotnet --version`. PostgreSQL-сценарії продовжує виконувати основний build-and-test.
+
+**Перевірка.** Серверна Release-збірка й тести локально на встановленому SDK;
+обидві ОС та мінімальний SDK перевіряються окремими jobs CI. Матриця не встановлює MAUI.
